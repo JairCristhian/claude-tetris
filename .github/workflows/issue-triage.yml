@@ -83,7 +83,7 @@ jobs:
                  ```
                - Si existe un comentario, actualízalo:
                  ```bash
-                 gh api -X PATCH repos/${{ github.repository }}/issues/comments/<COMMENT_ID> -f body=@/tmp/triage.md
+                 gh api -X PATCH repos/${{ github.repository }}/issues/comments/<COMMENT_ID> -F body=@/tmp/triage.md
                  ```
                - Si NO existe, crea uno nuevo:
                  ```bash
