@@ -24,7 +24,7 @@ jobs:
 
     steps:
       - name: Descargar repositorio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 1
 
@@ -34,87 +34,108 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          show_full_output: true
 
           prompt: |
             ## Tarea: Analizar y hacer triage de un issue
 
-            **Issue #${{ github.event.issue.number }}: ${{ github.event.issue.title }}**
-
-            **Descripción:**
-            ```
-            ${{ github.event.issue.body }}
-            ```
-
-            **Acción:** El tipo de evento fue `${{ github.event.action }}`.
+            **Repositorio:** ${{ github.repository }}
+            **Issue:** #${{ github.event.issue.number }}
+            **Acción:** ${{ github.event.action }}
 
             ### Instrucciones
 
-            1. **Leer el código:** Revisa los archivos clave del juego Tetris:
+            1. **Leer el issue completo:**
+               ```bash
+               gh issue view ${{ github.event.issue.number }} --json title,body,labels,author
+               ```
+
+            2. **Leer el código del proyecto:** Revisa los archivos clave del juego Tetris:
                - `game.js` (lógica del juego)
                - `index.html` (estructura y UI)
                - `style.css` (estilos)
                - `CLAUDE.md` (arquitectura y guía de desarrollo)
 
-            2. **Gestionar labels:**
-               - Ejecuta `gh label list` para listar los labels existentes.
-               - Asigna los labels apropiados al issue con `gh issue edit ${{ github.event.issue.number }} --add-label "label1,label2"`.
-               - Crea cualquier label faltante con `gh label create --force` si es necesario, usando esta taxonomía base:
-                 - `bug` (defectos)
-                 - `enhancement` (mejoras/features)
-                 - `question` (preguntas)
-                 - `documentation` (documentación)
-                 - `gameplay` (mecánicas del juego)
-                 - `ui` (interfaz de usuario)
-                 - `performance` (rendimiento)
-                 - `prioridad:alta`, `prioridad:media`, `prioridad:baja` (prioridad)
-
-            3. **Publicar/actualizar diagnóstico:**
-               - Busca un comentario existente con el marcador `<!-- claude-issue-triage -->` usando:
+            3. **Gestionar labels:**
+               - Primero, ejecuta `gh label list` para ver los labels existentes.
+               - Crea los labels base necesarios (si no existen):
                  ```bash
-                 gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments --jq '.[] | select(.body | contains("claude-issue-triage")) | .id'
+                 gh label create "bug" --force --description "Defectos en el código"
+                 gh label create "enhancement" --force --description "Mejoras y nuevas características"
+                 gh label create "question" --force --description "Preguntas sobre el proyecto"
+                 gh label create "documentation" --force --description "Mejoras en la documentación"
+                 gh label create "gameplay" --force --description "Mecánicas y lógica del juego"
+                 gh label create "ui" --force --description "Interfaz de usuario"
+                 gh label create "performance" --force --description "Rendimiento y optimización"
+                 gh label create "prioridad:alta" --force --description "Prioridad alta"
+                 gh label create "prioridad:media" --force --description "Prioridad media"
+                 gh label create "prioridad:baja" --force --description "Prioridad baja"
                  ```
-               - Si existe (edición del issue), actualízalo con PATCH en lugar de crear uno nuevo.
-               - Si no existe, crea un comentario nuevo.
-               - **Formato del comentario en español:**
-                 ```
-                 <!-- claude-issue-triage -->
-
-                 ## 🔍 Diagnóstico
-
-                 [Resumen breve del problema]
-
-                 ### Tipo y Prioridad
-                 | Campo | Valor |
-                 |-------|-------|
-                 | **Tipo** | bug/enhancement/question/etc |
-                 | **Prioridad** | alta/media/baja |
-                 | **Área** | gameplay/ui/performance/etc |
-
-                 ### Causa Probable
-                 [Descripción de la causa raíz, referenciando archivos y funciones específicas, ej: `game.js:drop()`, `index.html:canvas`]
-
-                 ### Plan de Implementación
-                 - [ ] Paso 1
-                 - [ ] Paso 2
-                 - [ ] Paso 3
-
-                 ### Criterios de Aceptación
-                 - El cambio debe...
-                 - Se debe verificar que...
-
-                 ### Notas y Preguntas Abiertas
-                 [Cualquier riesgo, aspecto indefinido, o información faltante]
+               - Asigna los labels apropiados al issue:
+                 ```bash
+                 gh issue edit ${{ github.event.issue.number }} --add-label "label1,label2,label3"
                  ```
 
-            4. **Restricciones:**
-               - NO modifiques el código del repositorio.
-               - NO abras pull requests.
-               - NO inventes información: si algo está poco claro, indícalo en "Notas y Preguntas Abiertas".
-               - Sé conciso pero completo.
+            4. **Crear o actualizar diagnóstico:**
+               - Busca si existe un comentario con el marcador `<!-- claude-issue-triage -->`:
+                 ```bash
+                 gh api repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments --jq '.[] | select(.body | contains("claude-issue-triage")) | .id' | head -1
+                 ```
+               - Si existe un comentario, actualízalo:
+                 ```bash
+                 gh api -X PATCH repos/${{ github.repository }}/issues/comments/<COMMENT_ID> -F body=@/tmp/triage.md
+                 ```
+               - Si NO existe, crea uno nuevo:
+                 ```bash
+                 gh issue comment ${{ github.event.issue.number }} --body-file /tmp/triage.md
+                 ```
 
-            5. **Resultado:**
-               - El issue tendrá labels asignados automáticamente.
-               - El issue tendrá un comentario con diagnóstico detallado en español.
-               - Ese comentario será actualizado si el issue es editado (no se duplica).
+            5. **Contenido del diagnóstico (guardar en /tmp/triage.md):**
+               El formato debe ser en español:
+               ```markdown
+               <!-- claude-issue-triage -->
 
-          claude_args: '--allowed-tools "Bash(gh),Read"'
+               ## 🔍 Diagnóstico
+
+               [Resumen breve del problema en 2-3 líneas]
+
+               ### Tipo y Prioridad
+               | Campo | Valor |
+               |-------|-------|
+               | **Tipo** | bug/enhancement/question/documentation/etc |
+               | **Prioridad** | alta/media/baja |
+               | **Área Afectada** | gameplay/ui/performance/rendering/controls/scoring/etc |
+
+               ### Causa Probable
+               [Descripción técnica de la causa raíz, con referencias a:
+                - Archivos específicos: `game.js`, `index.html`, `style.css`
+                - Funciones/variables: `función()`, `variable`
+                - Números de línea aproximados si es relevante]
+
+               ### Plan de Implementación
+               - [ ] Paso 1: [descripción breve]
+               - [ ] Paso 2: [descripción breve]
+               - [ ] Paso 3: [descripción breve]
+               (máximo 5 pasos claros y ejecutables)
+
+               ### Criterios de Aceptación
+               - El cambio debe cumplir con...
+               - Se debe verificar que...
+               - La funcionalidad debe...
+
+               ### Notas y Preguntas Abiertas
+               - [Riesgo 1 o aspecto indefinido]
+               - [Riesgo 2 o información faltante]
+               - [Pregunta para el implementador]
+
+               ---
+               *Diagnóstico generado automáticamente por Claude* 🤖
+               ```
+
+            6. **Restricciones finales:**
+               - NO modifiques archivos de código del repositorio.
+               - NO crees pull requests ni branches.
+               - NO inventes información: si algo es ambiguo o desconocido, indícalo en "Notas y Preguntas Abiertas".
+               - Sé conciso, claro y útil para el implementador.
+
+          claude_args: '--allowed-tools "Bash(gh issue:*),Bash(gh label:*),Bash(gh api:*),Read,Write,Glob" --max-turns 15'
