@@ -169,7 +169,7 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -300,5 +300,37 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+// ---- Tema claro/oscuro ----
+const themeToggle = document.getElementById('theme-toggle');
+const themeText = document.getElementById('theme-text');
+const THEME_KEY = 'tetris-theme';
+const schemeQuery = window.matchMedia('(prefers-color-scheme: light)');
+
+function storedTheme() {
+  try { return localStorage.getItem(THEME_KEY); } catch { return null; }
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const isLight = theme === 'light';
+  themeToggle.setAttribute('aria-checked', isLight);
+  themeText.textContent = isLight ? 'Claro' : 'Oscuro';
+  // repintar para que el canvas refleje el tema aun en pausa o game over
+  if (board) { draw(); drawNext(); }
+}
+
+themeToggle.addEventListener('click', () => {
+  const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+  applyTheme(theme);
+  themeToggle.blur(); // evita que Space/Enter vuelvan a activar el botón
+});
+
+schemeQuery.addEventListener('change', e => {
+  if (!storedTheme()) applyTheme(e.matches ? 'light' : 'dark');
+});
+
+applyTheme(storedTheme() || (schemeQuery.matches ? 'light' : 'dark'));
 
 init();
