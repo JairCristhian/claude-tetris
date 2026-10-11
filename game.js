@@ -42,6 +42,13 @@ const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, elapsed, shownSecond;
+let startLevel = 1;     // nivel con el que empezó la partida actual
+let nextStartLevel = 1; // nivel elegido en el menú de pausa, se aplica en init()
+
+// Intervalo de caída en ms para un nivel dado
+function speedFor(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
+}
 
 function formatTime(ms) {
   const total = Math.floor(ms / 1000);
@@ -125,7 +132,7 @@ function clearLines() {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
     level = startLevel + Math.floor(lines / 10);
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    dropInterval = speedFor(level);
     updateHUD();
   }
 }
@@ -280,10 +287,11 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
+  startLevel = nextStartLevel;
   level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+  dropInterval = speedFor(level);
   dropAccum = 0;
   elapsed = 0;
   shownSecond = -1;
@@ -298,7 +306,7 @@ function init() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+  if (e.code === 'KeyP' || e.code === 'Escape') { if (!e.repeat) togglePause(); return; }
   if (paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':

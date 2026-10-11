@@ -272,6 +272,10 @@ kbd {
   min-width: 220px;
 }
 
+.pause-box:focus {
+  outline: none;
+}
+
 .pause-title {
   font-size: 28px;
   font-weight: 800;

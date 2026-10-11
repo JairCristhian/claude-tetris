@@ -4,9 +4,9 @@
 // Se carga antes que game.js y usa sus globales (togglePause, init, paused...).
 
 const MAX_START_LEVEL = 15;
-let startLevel = 1; // nivel con el que empieza la próxima partida
 
 const pauseMenu = document.getElementById('pause-menu');
+const pauseBox = pauseMenu.querySelector('.pause-box');
 const resumeBtn = document.getElementById('resume-btn');
 const pauseRestartBtn = document.getElementById('pause-restart-btn');
 const startLevelSel = document.getElementById('start-level');
@@ -16,11 +16,10 @@ const menuControls = document.getElementById('menu-controls');
 for (let l = 1; l <= MAX_START_LEVEL; l++) {
   startLevelSel.add(new Option(`Nivel ${l}`, l));
 }
-startLevelSel.value = startLevel;
-
 function openPauseMenu() {
   pauseMenu.classList.remove('hidden');
-  resumeBtn.focus();
+  // foco en el contenedor: Space/Enter no deben activar "Reanudar" sin querer
+  pauseBox.focus();
 }
 
 function closePauseMenu() {
@@ -46,5 +45,5 @@ controlsBtn.addEventListener('click', () => {
 
 // Se aplica al reiniciar o empezar la siguiente partida, no a la actual
 startLevelSel.addEventListener('change', () => {
-  startLevel = Number(startLevelSel.value);
+  nextStartLevel = Number(startLevelSel.value);
 });
