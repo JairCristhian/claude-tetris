@@ -29,7 +29,8 @@ function closePauseMenu() {
   controlsBtn.setAttribute('aria-expanded', 'false');
 }
 
-resumeBtn.addEventListener('click', togglePause);
+// Arrow function: togglePause se define en game.js, que carga después de este archivo
+resumeBtn.addEventListener('click', () => togglePause());
 
 pauseRestartBtn.addEventListener('click', () => {
   closePauseMenu();
