@@ -4,16 +4,9 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#7986cb', // J - indigo
-  '#ffb74d', // L - orange
-];
+// Paletas y estilos de bloque en skins.js (tabla SKINS)
+let skinKey = loadSkinKey();
+let skin = SKINS[skinKey];
 
 const PIECES = [
   null,
@@ -183,18 +176,11 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
-  context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  skin.drawBlock(context, x, y, skin.palette[colorIndex], size, alpha);
 }
 
 function drawGrid() {
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+  ctx.strokeStyle = skin.grid || getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -363,5 +349,31 @@ schemeQuery.addEventListener('change', e => {
 });
 
 applyTheme(storedTheme() || (schemeQuery.matches ? 'light' : 'dark'));
+
+// ---- Skins de bloques ----
+const skinSelect = document.getElementById('skin-select');
+
+function applySkin(key) {
+  skinKey = key;
+  skin = SKINS[key];
+  canvas.style.background = skin.bg || '';
+  nextCanvas.style.background = skin.bg || '';
+  // repintar aun en pausa o game over
+  if (board) { draw(); drawNext(); }
+}
+
+skinSelect.value = skinKey;
+applySkin(skinKey);
+
+// Las flechas y Space son de juego: que no cambien la opción del select con foco
+skinSelect.addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+});
+
+skinSelect.addEventListener('change', e => {
+  saveSkinKey(e.target.value);
+  applySkin(e.target.value);
+  skinSelect.blur(); // evita que Space/flechas cambien la opción del select
+});
 
 init();
