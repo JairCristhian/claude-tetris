@@ -4,16 +4,9 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#7986cb', // J - indigo
-  '#ffb74d', // L - orange
-];
+// Paletas y estilos de bloque en skins.js (tabla SKINS)
+let skinKey = loadSkinKey();
+let skin = SKINS[skinKey];
 
 const PIECES = [
   null,
@@ -40,8 +33,25 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+const startRecords = document.getElementById('start-records');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+const gameoverExtra = document.getElementById('gameover-extra');
+const gameoverRecords = document.getElementById('gameover-records');
+const nameForm = document.getElementById('name-form');
+const nameInput = document.getElementById('name-input');
+const saveRecordBtn = document.getElementById('save-record-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, elapsed, shownSecond;
+let startLevel = 1;     // nivel con el que empezó la partida actual
+let nextStartLevel = 1; // nivel elegido en el menú de pausa, se aplica en init()
+let started = false, combo = 0, maxCombo = 0, runSaved = false;
+
+// Intervalo de caída en ms para un nivel dado
+function speedFor(lvl) {
+  return Math.max(100, 1000 - (lvl - 1) * 90);
+}
 
 function formatTime(ms) {
   const total = Math.floor(ms / 1000);
@@ -124,10 +134,11 @@ function clearLines() {
   if (cleared) {
     lines += cleared;
     score += (LINE_SCORES[cleared] || 0) * level;
-    level = Math.floor(lines / 10) + 1;
-    dropInterval = Math.max(100, 1000 - (level - 1) * 90);
+    level = startLevel + Math.floor(lines / 10);
+    dropInterval = speedFor(level);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -155,7 +166,10 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  // combo: líneas acumuladas en piezas consecutivas que limpian; se resetea si una no limpia
+  combo = cleared ? combo + cleared : 0;
+  maxCombo = Math.max(maxCombo, combo);
   spawn();
 }
 
@@ -176,18 +190,11 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
-  context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
-  context.globalAlpha = 1;
+  skin.drawBlock(context, x, y, skin.palette[colorIndex], size, alpha);
 }
 
 function drawGrid() {
-  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
+  ctx.strokeStyle = skin.grid || getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -241,20 +248,40 @@ function endGame() {
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()} · Tiempo: ${formatTime(elapsed)}`;
+  updateRunStats(maxCombo, lines);
+  const qualifies = isTopScore(score);
+  runSaved = false;
+  nameForm.classList.toggle('hidden', !qualifies);
+  renderRecords(gameoverRecords);
+  gameoverExtra.classList.remove('hidden');
   overlay.classList.remove('hidden');
+  if (qualifies) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+}
+
+function saveCurrentRecord() {
+  if (runSaved) return; // evita guardar dos veces la misma partida
+  runSaved = true;
+  const name = nameInput.value.trim() || 'Anónimo';
+  const pos = insertRecord(name, score, lines);
+  nameInput.blur();
+  nameForm.classList.add('hidden');
+  renderRecords(gameoverRecords, pos);
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
+    closePauseMenu();
     lastTime = performance.now();
+    dropAccum = 0; // evita que la pieza salte al reanudar
     loop(lastTime);
   } else {
     cancelAnimationFrame(animId);
-    overlayTitle.textContent = 'PAUSA';
-    overlayScore.textContent = '';
-    overlay.classList.remove('hidden');
+    openPauseMenu();
   }
 }
 
@@ -280,10 +307,14 @@ function init() {
   board = createBoard();
   score = 0;
   lines = 0;
-  level = 1;
+  startLevel = nextStartLevel;
+  level = startLevel;
   paused = false;
   gameOver = false;
-  dropInterval = 1000;
+  started = true;
+  combo = 0;
+  maxCombo = 0;
+  dropInterval = speedFor(level);
   dropAccum = 0;
   elapsed = 0;
   shownSecond = -1;
@@ -293,13 +324,16 @@ function init() {
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  gameoverExtra.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
-  if (e.code === 'KeyP') { togglePause(); return; }
-  if (paused || gameOver) return;
+  // con el foco en el campo de nombre, las teclas son texto, no controles
+  if (e.target.tagName === 'INPUT') return;
+  if (e.code === 'KeyP' || e.code === 'Escape') { if (!e.repeat) togglePause(); return; }
+  if (!started || paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -323,6 +357,24 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+// ---- Records y pantalla de inicio ----
+saveRecordBtn.addEventListener('click', saveCurrentRecord);
+nameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveCurrentRecord(); }
+});
+
+startBtn.addEventListener('click', () => {
+  startOverlay.classList.add('hidden');
+  startBtn.blur(); // evita que Space vuelva a pulsar "Jugar"
+  init();
+});
+
+resetRecordsBtn.addEventListener('click', () => {
+  if (!confirm('¿Borrar todos los records? Esta acción no se puede deshacer.')) return;
+  resetRecords();
+  renderRecords(startRecords);
+});
 
 // ---- Tema claro/oscuro ----
 const themeToggle = document.getElementById('theme-toggle');
@@ -356,4 +408,31 @@ schemeQuery.addEventListener('change', e => {
 
 applyTheme(storedTheme() || (schemeQuery.matches ? 'light' : 'dark'));
 
-init();
+// ---- Skins de bloques ----
+const skinSelect = document.getElementById('skin-select');
+
+function applySkin(key) {
+  skinKey = key;
+  skin = SKINS[key];
+  canvas.style.background = skin.bg || '';
+  nextCanvas.style.background = skin.bg || '';
+  // repintar aun en pausa o game over
+  if (board) { draw(); drawNext(); }
+}
+
+skinSelect.value = skinKey;
+applySkin(skinKey);
+
+// Las flechas y Space son de juego: que no cambien la opción del select con foco
+skinSelect.addEventListener('keydown', e => {
+  if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) e.preventDefault();
+});
+
+skinSelect.addEventListener('change', e => {
+  saveSkinKey(e.target.value);
+  applySkin(e.target.value);
+  skinSelect.blur(); // evita que Space/flechas cambien la opción del select
+});
+
+// La partida no arranca sola: se inicia desde el botón "Jugar" del overlay de inicio
+renderRecords(startRecords);
