@@ -33,10 +33,20 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+const startRecords = document.getElementById('start-records');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+const gameoverExtra = document.getElementById('gameover-extra');
+const gameoverRecords = document.getElementById('gameover-records');
+const nameForm = document.getElementById('name-form');
+const nameInput = document.getElementById('name-input');
+const saveRecordBtn = document.getElementById('save-record-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, elapsed, shownSecond;
 let startLevel = 1;     // nivel con el que empezó la partida actual
 let nextStartLevel = 1; // nivel elegido en el menú de pausa, se aplica en init()
+let started = false, combo = 0, maxCombo = 0, runSaved = false;
 
 // Intervalo de caída en ms para un nivel dado
 function speedFor(lvl) {
@@ -128,6 +138,7 @@ function clearLines() {
     dropInterval = speedFor(level);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -155,7 +166,10 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  // combo: líneas acumuladas en piezas consecutivas que limpian; se resetea si una no limpia
+  combo = cleared ? combo + cleared : 0;
+  maxCombo = Math.max(maxCombo, combo);
   spawn();
 }
 
@@ -234,11 +248,31 @@ function endGame() {
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()} · Tiempo: ${formatTime(elapsed)}`;
+  updateRunStats(maxCombo, lines);
+  const qualifies = isTopScore(score);
+  runSaved = false;
+  nameForm.classList.toggle('hidden', !qualifies);
+  renderRecords(gameoverRecords);
+  gameoverExtra.classList.remove('hidden');
   overlay.classList.remove('hidden');
+  if (qualifies) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+}
+
+function saveCurrentRecord() {
+  if (runSaved) return; // evita guardar dos veces la misma partida
+  runSaved = true;
+  const name = nameInput.value.trim() || 'Anónimo';
+  const pos = insertRecord(name, score, lines);
+  nameInput.blur();
+  nameForm.classList.add('hidden');
+  renderRecords(gameoverRecords, pos);
 }
 
 function togglePause() {
-  if (gameOver) return;
+  if (!started || gameOver) return;
   paused = !paused;
   if (!paused) {
     closePauseMenu();
@@ -277,6 +311,9 @@ function init() {
   level = startLevel;
   paused = false;
   gameOver = false;
+  started = true;
+  combo = 0;
+  maxCombo = 0;
   dropInterval = speedFor(level);
   dropAccum = 0;
   elapsed = 0;
@@ -287,13 +324,16 @@ function init() {
   spawn();
   updateHUD();
   overlay.classList.add('hidden');
+  gameoverExtra.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
+  // con el foco en el campo de nombre, las teclas son texto, no controles
+  if (e.target.tagName === 'INPUT') return;
   if (e.code === 'KeyP' || e.code === 'Escape') { if (!e.repeat) togglePause(); return; }
-  if (paused || gameOver) return;
+  if (!started || paused || gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -317,6 +357,24 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+// ---- Records y pantalla de inicio ----
+saveRecordBtn.addEventListener('click', saveCurrentRecord);
+nameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveCurrentRecord(); }
+});
+
+startBtn.addEventListener('click', () => {
+  startOverlay.classList.add('hidden');
+  startBtn.blur(); // evita que Space vuelva a pulsar "Jugar"
+  init();
+});
+
+resetRecordsBtn.addEventListener('click', () => {
+  if (!confirm('¿Borrar todos los records? Esta acción no se puede deshacer.')) return;
+  resetRecords();
+  renderRecords(startRecords);
+});
 
 // ---- Tema claro/oscuro ----
 const themeToggle = document.getElementById('theme-toggle');
@@ -376,4 +434,5 @@ skinSelect.addEventListener('change', e => {
   skinSelect.blur(); // evita que Space/flechas cambien la opción del select
 });
 
-init();
+// La partida no arranca sola: se inicia desde el botón "Jugar" del overlay de inicio
+renderRecords(startRecords);
