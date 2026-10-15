@@ -4,16 +4,77 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#7986cb', // J - indigo
-  '#ffb74d', // L - orange
-];
+// Cada skin define su paleta (índice 1..7 = piezas I,O,T,S,Z,J,L) y cómo dibujar un bloque.
+// px, py: esquina superior izquierda en píxeles; size: lado del bloque.
+const SKINS = {
+  retro: {
+    colors: [null, '#4dd0e1', '#ffd54f', '#ba68c8', '#81c784', '#e57373', '#7986cb', '#ffb74d'],
+    drawBlock(ctx, px, py, size, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
+      // highlight
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(px + 1, py + 1, size - 2, 4);
+    },
+  },
+  neon: {
+    colors: [null, '#00e5ff', '#ffea00', '#ff40ff', '#39ff14', '#ff3860', '#3d5afe', '#ff9100'],
+    drawBlock(ctx, px, py, size, color) {
+      ctx.fillStyle = 'rgba(8,8,16,0.85)';
+      ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
+      // glow: shadowBlur solo para este bloque, se resetea al final
+      ctx.shadowColor = color;
+      ctx.shadowBlur = size * 0.6;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(px + 3, py + 3, size - 6, size - 6);
+      ctx.shadowBlur = 0;
+    },
+  },
+  pastel: {
+    colors: [null, '#b8e7ee', '#fff1b3', '#e0c8f0', '#c8f0cc', '#f7c4c4', '#c5cbf0', '#ffd9a8'],
+    drawBlock(ctx, px, py, size, color) {
+      roundedRectPath(ctx, px + 2, py + 2, size - 4, size - 4, 6);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    },
+  },
+  pixel: {
+    colors: [null, '#00bcd4', '#ffc107', '#9c27b0', '#4caf50', '#f44336', '#3f51b5', '#ff9800'],
+    drawBlock(ctx, px, py, size, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
+      // textura: rejilla 4x4 de celdas claras en tablero de ajedrez
+      const cell = Math.floor((size - 8) / 4);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)';
+      for (let i = 0; i < 4; i++)
+        for (let j = 0; j < 4; j++)
+          if ((i + j) % 2 === 0) ctx.fillRect(px + 4 + i * cell, py + 4 + j * cell, cell, cell);
+      // bisel: luz arriba-izquierda, sombra abajo-derecha
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.fillRect(px + 1, py + 1, size - 2, 2);
+      ctx.fillRect(px + 1, py + 1, 2, size - 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fillRect(px + 1, py + size - 3, size - 2, 2);
+      ctx.fillRect(px + size - 3, py + 1, 2, size - 2);
+    },
+  },
+};
+
+let currentSkin = 'retro';
+
+function roundedRectPath(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
 
 const PIECES = [
   null,
@@ -189,13 +250,9 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
+  const skin = SKINS[currentSkin];
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  skin.drawBlock(context, x * size, y * size, size, skin.colors[colorIndex]);
   context.globalAlpha = 1;
 }
 
@@ -403,5 +460,29 @@ schemeQuery.addEventListener('change', e => {
 });
 
 applyTheme(storedTheme() || (schemeQuery.matches ? 'light' : 'dark'));
+
+// ---- Skin visual ----
+const skinSelect = document.getElementById('skin-select');
+const SKIN_KEY = 'tetris-skin';
+
+function storedSkin() {
+  try { return localStorage.getItem(SKIN_KEY); } catch { return null; }
+}
+
+function applySkin(name) {
+  currentSkin = Object.hasOwn(SKINS, name) ? name : 'retro';
+  document.documentElement.dataset.skin = currentSkin;
+  skinSelect.value = currentSkin;
+  // repintar para que el cambio se vea aun en pausa o game over
+  if (board) { draw(); drawNext(); }
+}
+
+skinSelect.addEventListener('change', () => {
+  try { localStorage.setItem(SKIN_KEY, skinSelect.value); } catch {}
+  applySkin(skinSelect.value);
+  skinSelect.blur(); // evita que Space/flechas cambien la opción durante la partida
+});
+
+applySkin(storedSkin() || 'retro');
 
 init();
