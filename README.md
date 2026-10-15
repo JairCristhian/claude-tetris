@@ -139,6 +139,14 @@ init()
 
 Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara `endGame()` y se muestra el overlay de **Game Over**.
 
+### Records (`records.js`)
+
+- Guarda en `localStorage` (clave `tetris.records`) el **top 5** de puntuaciones con nombre, líneas, fecha, el **mejor combo** y las **líneas máximas**.
+- La pantalla de inicio muestra la tabla y el botón **Jugar**; el juego arranca al pulsarlo.
+- Al hacer game over, si la puntuación entra en el top se pide un nombre (Enter o **Guardar**) y la fila nueva se resalta.
+- El **combo** cuenta las líneas acumuladas en piezas consecutivas que limpian; se reinicia si una pieza no limpia nada.
+- **Resetear records** borra la tabla tras confirmar.
+
 ---
 
 ## Tecnologías
@@ -159,6 +167,7 @@ Cuando una pieza recién generada ya colisiona al aparecer (`spawn`), se dispara
 03-tetris/
 ├── index.html      # Estructura del DOM y canvas
 ├── style.css       # Estilos del juego (dark theme)
+├── records.js      # Tabla de records local (localStorage)
 ├── game.js         # Toda la lógica del Tetris (~300 líneas)
 └── README.md
 ```

@@ -109,8 +109,18 @@ const pauseRestartBtn = document.getElementById('pause-restart-btn');
 const controlsBtn = document.getElementById('controls-btn');
 const backBtn = document.getElementById('back-btn');
 const startLevelSel = document.getElementById('start-level');
+const startOverlay = document.getElementById('start-overlay');
+const startBtn = document.getElementById('start-btn');
+const startRecords = document.getElementById('start-records');
+const resetRecordsBtn = document.getElementById('reset-records-btn');
+const gameoverExtra = document.getElementById('gameover-extra');
+const gameoverRecords = document.getElementById('gameover-records');
+const nameForm = document.getElementById('name-form');
+const nameInput = document.getElementById('name-input');
+const saveRecordBtn = document.getElementById('save-record-btn');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId, elapsed, shownSecond;
+let started = false, combo = 0, maxCombo = 0, runSaved = false;
 let startLevel = 1; // nivel con el que empieza cada partida (lo elige el usuario en pausa)
 
 function intervalFor(lvl) {
@@ -202,6 +212,7 @@ function clearLines() {
     dropInterval = intervalFor(level);
     updateHUD();
   }
+  return cleared;
 }
 
 function ghostY() {
@@ -229,7 +240,10 @@ function softDrop() {
 
 function lockPiece() {
   merge();
-  clearLines();
+  const cleared = clearLines();
+  // combo: líneas acumuladas en piezas consecutivas que limpian; se resetea si una no limpia
+  combo = cleared ? combo + cleared : 0;
+  maxCombo = Math.max(maxCombo, combo);
   spawn();
 }
 
@@ -311,7 +325,27 @@ function endGame() {
   cancelAnimationFrame(animId);
   overlayTitle.textContent = 'GAME OVER';
   overlayScore.textContent = `Puntuación: ${score.toLocaleString()} · Tiempo: ${formatTime(elapsed)}`;
+  updateRunStats(maxCombo, lines);
+  const qualifies = isTopScore(score);
+  runSaved = false;
+  nameForm.classList.toggle('hidden', !qualifies);
+  renderRecords(gameoverRecords);
+  gameoverExtra.classList.remove('hidden');
   overlay.classList.remove('hidden');
+  if (qualifies) {
+    nameInput.value = '';
+    nameInput.focus();
+  }
+}
+
+function saveCurrentRecord() {
+  if (runSaved) return; // evita guardar dos veces la misma partida
+  runSaved = true;
+  const name = nameInput.value.trim() || 'Anónimo';
+  const pos = insertRecord(name, score, lines);
+  nameInput.blur();
+  nameForm.classList.add('hidden');
+  renderRecords(gameoverRecords, pos);
 }
 
 // evita que Space/Enter vuelvan a activar el último botón usado
@@ -367,6 +401,9 @@ function init() {
   level = startLevel;
   paused = false;
   gameOver = false;
+  started = true;
+  combo = 0;
+  maxCombo = 0;
   dropInterval = intervalFor(level);
   dropAccum = 0;
   elapsed = 0;
@@ -379,24 +416,27 @@ function init() {
   overlay.classList.add('hidden');
   pauseMenu.classList.add('hidden');
   releaseFocus();
+  gameoverExtra.classList.add('hidden');
   cancelAnimationFrame(animId);
   animId = requestAnimationFrame(loop);
 }
 
 document.addEventListener('keydown', e => {
+  // con el foco en el campo de nombre, las teclas son texto, no controles
+  if (e.target.tagName === 'INPUT') return;
   if (e.code === 'KeyP' || e.code === 'Escape') {
     e.preventDefault();
-    if (gameOver) return;
+    if (!started || gameOver) return;
     if (!paused) pause();
     else if (e.code === 'Escape' && !pauseControls.classList.contains('hidden')) showPauseView(false);
     else resume();
     return;
   }
+  if (!started || gameOver) return;
   if (paused) {
     if (e.code === 'Space') e.preventDefault(); // no activar un botón enfocado
     return;
   }
-  if (gameOver) return;
   switch (e.code) {
     case 'ArrowLeft':
       if (!collide(current.shape, current.x - 1, current.y)) current.x--;
@@ -427,6 +467,24 @@ backBtn.addEventListener('click', () => { showPauseView(false); releaseFocus(); 
 startLevelSel.addEventListener('change', e => {
   startLevel = Number(e.target.value);
   releaseFocus();
+});
+
+// ---- Records y pantalla de inicio ----
+saveRecordBtn.addEventListener('click', saveCurrentRecord);
+nameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); saveCurrentRecord(); }
+});
+
+startBtn.addEventListener('click', () => {
+  startOverlay.classList.add('hidden');
+  startBtn.blur(); // evita que Space vuelva a pulsar "Jugar"
+  init();
+});
+
+resetRecordsBtn.addEventListener('click', () => {
+  if (!confirm('¿Borrar todos los records? Esta acción no se puede deshacer.')) return;
+  resetRecords();
+  renderRecords(startRecords);
 });
 
 // ---- Tema claro/oscuro ----
@@ -485,4 +543,4 @@ skinSelect.addEventListener('change', () => {
 
 applySkin(storedSkin() || 'retro');
 
-init();
+renderRecords(startRecords);
