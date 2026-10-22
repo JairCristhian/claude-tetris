@@ -4,16 +4,100 @@ const COLS = 10;
 const ROWS = 20;
 const BLOCK = 30;
 
-const COLORS = [
-  null,
-  '#4dd0e1', // I - cyan
-  '#ffd54f', // O - yellow
-  '#ba68c8', // T - purple
-  '#81c784', // S - green
-  '#e57373', // Z - red
-  '#7986cb', // J - indigo
-  '#ffb74d', // L - orange
-];
+// ---- Skins ----
+// Cada skin define su paleta (índice 1–7) y cómo se dibuja una celda.
+const SKINS = {
+  retro: {
+    label: 'Retro',
+    colors: [
+      null,
+      '#4dd0e1', // I - cyan
+      '#ffd54f', // O - yellow
+      '#ba68c8', // T - purple
+      '#81c784', // S - green
+      '#e57373', // Z - red
+      '#7986cb', // J - indigo
+      '#ffb74d', // L - orange
+    ],
+    drawCell(context, x, y, size, color) {
+      context.fillStyle = color;
+      context.fillRect(x + 1, y + 1, size - 2, size - 2);
+      // highlight
+      context.fillStyle = 'rgba(255,255,255,0.12)';
+      context.fillRect(x + 1, y + 1, size - 2, 4);
+    },
+  },
+  neon: {
+    label: 'Neon',
+    colors: [
+      null,
+      '#00e5ff',
+      '#ffea00',
+      '#ff40ff',
+      '#76ff03',
+      '#ff1744',
+      '#448aff',
+      '#ff9100',
+    ],
+    drawCell(context, x, y, size, color) {
+      context.shadowColor = color;
+      context.shadowBlur = 12;
+      context.fillStyle = color;
+      context.fillRect(x + 3, y + 3, size - 6, size - 6);
+      context.shadowBlur = 0;
+    },
+  },
+  pastel: {
+    label: 'Pastel',
+    colors: [
+      null,
+      '#a8e6ff',
+      '#fff3a3',
+      '#d9b8f5',
+      '#b5f0c8',
+      '#ffb3b3',
+      '#b8c4f7',
+      '#ffd1a3',
+    ],
+    drawCell(context, x, y, size, color) {
+      context.fillStyle = color;
+      roundRect(context, x + 2, y + 2, size - 4, size - 4, 6);
+      context.fill();
+    },
+  },
+  pixel: {
+    label: 'Pixel art',
+    colors: [
+      null,
+      '#4dd0e1',
+      '#ffd54f',
+      '#ba68c8',
+      '#81c784',
+      '#e57373',
+      '#7986cb',
+      '#ffb74d',
+    ],
+    drawCell(context, x, y, size, color) {
+      context.fillStyle = color;
+      context.fillRect(x + 1, y + 1, size - 2, size - 2);
+      // textura: cuadrícula de puntos oscuros
+      context.fillStyle = 'rgba(0,0,0,0.25)';
+      for (let py = 4; py < size - 4; py += 6)
+        for (let px = 4; px < size - 4; px += 6)
+          context.fillRect(x + px, y + py, 2, 2);
+    },
+  },
+};
+
+function roundRect(context, x, y, w, h, r) {
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + w, y, x + w, y + h, r);
+  context.arcTo(x + w, y + h, x, y + h, r);
+  context.arcTo(x, y + h, x, y, r);
+  context.arcTo(x, y, x + w, y, r);
+  context.closePath();
+}
 
 const PIECES = [
   null,
@@ -188,13 +272,8 @@ function updateHUD() {
 
 function drawBlock(context, x, y, colorIndex, size, alpha) {
   if (!colorIndex) return;
-  const color = COLORS[colorIndex];
   context.globalAlpha = alpha ?? 1;
-  context.fillStyle = color;
-  context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
-  // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
-  context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
+  currentSkin.drawCell(context, x * size, y * size, size, currentSkin.colors[colorIndex]);
   context.globalAlpha = 1;
 }
 
@@ -390,5 +469,31 @@ schemeQuery.addEventListener('change', e => {
 });
 
 applyTheme(storedTheme() || (schemeQuery.matches ? 'light' : 'dark'));
+
+// ---- Selector de skin ----
+const skinSelect = document.getElementById('skin-select');
+const SKIN_KEY = 'tetris-skin';
+let currentSkin = SKINS.retro;
+
+function storedSkin() {
+  try { return localStorage.getItem(SKIN_KEY); } catch { return null; }
+}
+
+function applySkin(key) {
+  const name = SKINS[key] ? key : 'retro';
+  currentSkin = SKINS[name];
+  document.documentElement.dataset.skin = name;
+  skinSelect.value = name;
+  // repintar con la nueva skin sin recargar
+  if (board) { draw(); drawNext(); }
+}
+
+skinSelect.addEventListener('change', () => {
+  try { localStorage.setItem(SKIN_KEY, skinSelect.value); } catch {}
+  applySkin(skinSelect.value);
+  skinSelect.blur();
+});
+
+applySkin(storedSkin() || 'retro');
 
 init();
