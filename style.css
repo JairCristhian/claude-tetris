@@ -207,6 +207,34 @@ kbd {
   transform: translateX(14px);
 }
 
+/* ---- Selector de skin ---- */
+.skin-select {
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.skin-select:hover {
+  border-color: var(--accent);
+}
+
+.skin-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Neon: tablero negro con cuadrícula tenue, sin importar el tema */
+:root[data-skin="neon"] {
+  --canvas-bg: #000000;
+  --grid: #14142a;
+  --border: #00e5ff;
+}
+
 /* ---- Overlay ---- */
 .overlay {
   position: absolute;
