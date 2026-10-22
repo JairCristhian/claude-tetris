@@ -219,8 +219,8 @@ kbd {
   border-radius: 4px;
 }
 
-.overlay.hidden {
-  display: none;
+.hidden {
+  display: none !important;
 }
 
 .overlay-box {
@@ -260,4 +260,85 @@ kbd {
 
 #restart-btn:hover {
   background: var(--accent-hover);
+}
+
+/* ---- Records ---- */
+.records {
+  width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.records-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 13px;
+}
+
+.records-table th {
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--label);
+  font-weight: 600;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.records-table td {
+  padding: 4px 6px;
+  text-align: center;
+  border-bottom: 1px solid var(--grid);
+}
+
+.records-table tr.hit td {
+  color: var(--accent);
+  font-weight: 700;
+  background: var(--accent-glow);
+}
+
+#records-stats {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.name-form {
+  display: flex;
+  gap: 8px;
+}
+
+.name-form input {
+  width: 180px;
+  background: var(--kbd-bg);
+  color: var(--text);
+  border: 1px solid var(--kbd-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 14px;
+}
+
+#save-btn {
+  background: var(--accent);
+  color: var(--on-accent);
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#save-btn:hover {
+  background: var(--accent-hover);
+}
+
+.link-btn {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
 }
